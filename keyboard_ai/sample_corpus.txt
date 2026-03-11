@@ -1,0 +1,6 @@
+Typing should feel light, balanced, and repeatable. A strong keyboard layout keeps common letters on comfortable keys, spreads work across both hands, and reduces same-finger stretches.
+
+Good prose uses frequent patterns like th, he, in, er, an, re, on, at, nd, and st. Conversation adds short words, quick turns, and repeated transitions. Code comments add terms like layout, score, optimize, train, corpus, and finger.
+
+This demo corpus is small on purpose. It gives the optimizer enough signal to learn a reasonable English-biased layout, but the real value comes from training on your own writing. If you mostly write technical notes, messages, essays, or code review comments, feed that text into the model and let it adapt.
+
