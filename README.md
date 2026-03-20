@@ -41,16 +41,6 @@ keyboard-ai train --stdin
 
 ---
 
-## Troubleshooting
-
-### `zsh: command not found: --generations`
-If you get this error, it's likely you missed the subcommand. Make sure your command starts with `keyboard-ai train`. 
-
-**Incorrect**: `keyboard-ai --generations 10`
-**Correct**: `keyboard-ai train --generations 10`
-
----
-
 ## Layout format
 
 Layouts are encoded as 26 lowercase letters in physical key order:
