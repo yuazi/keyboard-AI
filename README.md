@@ -11,67 +11,54 @@ The result is not a universal "best" layout for everyone, but the best layout th
 
 ## Installation
 
-From source (editable install):
+The easiest way to set up the project locally for development is to install it in "editable" mode. This makes the `keyboard-ai` command available everywhere in your terminal:
 
 ```bash
 git clone https://github.com/yuazi/keyboard-AI.git
 cd keyboard-AI
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
-You can then run the CLI via:
-
+After installing, check that it's working:
 ```bash
 keyboard-ai --help
 ```
 
+---
+
 ## Quick start
 
-Run the bundled demo corpus:
-
+### 1. Training a layout
+You can train a layout on the **bundled sample corpus** with:
 ```bash
-keyboard-ai train --generations 250 --population 64 --seed 7
+keyboard-ai train --generations 250 --population 64
 ```
 
-Paste your own text directly into the terminal:
-
+Or paste your own writing directly (Ctrl-D when finished):
 ```bash
 keyboard-ai train --stdin
 ```
 
-Type or paste your sample text, then press `Ctrl-D` (Unix/macOS) to start training.
-
-Train on your own writing:
-
+### 2. Scoring & Inspection
+Evaluate a specific layout string:
 ```bash
-keyboard-ai train --corpus notes.txt chatlog.txt code_comments.txt --generations 400 --population 80 --output artifacts/my-layout.json
+keyboard-ai score --corpus my_writing.txt --layout qwertyuiopasdfghjklzxcvbnm
 ```
 
-Resume training from a saved model:
-
-```bash
-keyboard-ai train --corpus notes.txt --resume artifacts/my-layout.json --generations 300 --output artifacts/my-layout-v2.json
-```
-
-Score any layout string:
-
-```bash
-keyboard-ai score --corpus notes.txt --layout qwertyuiopasdfghjklzxcvbnm
-```
-
-Score a layout against pasted terminal text:
-
-```bash
-keyboard-ai score --stdin --layout qwertyuiopasdfghjklzxcvbnm
-```
-
-Show a layout as rows:
-
+Visualize it as rows:
 ```bash
 keyboard-ai show --layout qwertyuiopasdfghjklzxcvbnm
 ```
+
+---
+
+## Troubleshooting
+
+### `zsh: command not found: --generations`
+If you get this error, it's likely you missed the subcommand. Make sure your command starts with `keyboard-ai train`. 
+
+**Incorrect**: `keyboard-ai --generations 10`
+**Correct**: `keyboard-ai train --generations 10`
 
 ---
 
@@ -91,28 +78,28 @@ This format is accepted by the `train`, `score`, and `show` commands wherever a 
 
 ---
 
-## Commands
+`keyboard-ai` currently exposes two main commands:
 
-`keyboard-ai` currently exposes three CLI commands:
+- `train`: Search for a better layout by learning from text.
+- `export`: Generate configuration files for external tools.
 
-- `train`: Learn from a corpus and search for a better layout.
-- `score`: Inspect the score and ergonomic breakdown of a layout.
-- `show`: Print a layout from a raw string or a saved model.
+### Input Sources
 
 `train` and `score` can learn from:
 
-- `--corpus file1.txt file2.txt`
-- `--stdin` for pasted terminal text
-- No custom source, which falls back to the bundled sample corpus.
+- `--corpus file1.txt file2.txt` (local files)
+- `--stdin` (pasted text in terminal)
+- *Default*: The bundled sample corpus if no input is given.
 
-Models are only saved when `--output` is provided.
+Models are only saved when you provide the `--output` flag.
 
 ---
 
-## Verification
+## Development & Verification
 
-Run the test suite with:
+I've set up some modern tools to keep the code clean and correct:
 
+### Run Tests
 ```bash
 python3 -m unittest discover -s tests -v
 ```
