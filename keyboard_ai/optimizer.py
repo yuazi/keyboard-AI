@@ -5,13 +5,17 @@ import json
 import math
 from pathlib import Path
 import random
+from typing import Optional
+
+from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
 
 from .corpus import CorpusStats
 from .layout import (
     QWERTY_LAYOUT,
+    Geometry,
+    GEOMETRIES,
     crossover_layout,
     mutate_layout,
-    normalize_layout,
     random_layout,
 )
 from .scoring import score_layout
@@ -50,6 +54,7 @@ class OptimizationResult:
     corpus_tokens: int
     corpus_letters: int
     config: EvolutionConfig
+    geometry_name: str
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -64,6 +69,7 @@ class OptimizationResult:
             "history": self.history,
             "corpus_tokens": self.corpus_tokens,
             "corpus_letters": self.corpus_letters,
+            "geometry_name": self.geometry_name,
             "config": {
                 "generations": self.config.generations,
                 "population_size": self.config.population_size,
@@ -107,6 +113,7 @@ class OptimizationResult:
             corpus_tokens=int(data["corpus_tokens"]),
             corpus_letters=int(data["corpus_letters"]),
             config=config,
+            geometry_name=str(data.get("geometry_name", "staggered")),
         )
 
 
@@ -114,10 +121,14 @@ class SelfLearningLayoutAI:
     def __init__(
         self,
         corpus: CorpusStats,
+        geometry: Geometry,
+        charset: str,
         config: EvolutionConfig | None = None,
         seed: int | None = None,
     ) -> None:
         self.corpus = corpus
+        self.geometry = geometry
+        self.charset = charset
         self.config = config or EvolutionConfig()
         self.seed = seed
         self.rng = random.Random(seed)
@@ -127,10 +138,12 @@ class SelfLearningLayoutAI:
         if not 1 <= self.config.elite_size < self.config.population_size:
             raise ValueError("elite_size must be between 1 and population_size - 1")
 
-    def train(self, initial_layout: str = QWERTY_LAYOUT) -> OptimizationResult:
-        initial_layout = normalize_layout(initial_layout)
-        baseline_score = score_layout(QWERTY_LAYOUT, self.corpus)
-        starting_score = score_layout(initial_layout, self.corpus)
+    def train(self, initial_layout: Optional[str] = None) -> OptimizationResult:
+        if initial_layout is None:
+            initial_layout = QWERTY_LAYOUT if self.geometry.name == "staggered" else random_layout(self.rng, self.charset, self.geometry)
+            
+        baseline_score = score_layout(QWERTY_LAYOUT, GEOMETRIES["staggered"], self.corpus) if self.geometry.name == "staggered" else 0.0
+        starting_score = score_layout(initial_layout, self.geometry, self.corpus)
 
         population = self._initial_population(initial_layout)
         self._evaluate(population)
@@ -139,39 +152,49 @@ class SelfLearningLayoutAI:
         best = Candidate(population[0].layout, population[0].sigma, population[0].score)
         history = [best.score or float("-inf")]
 
-        for _ in range(self.config.generations):
-            elites = [
-                Candidate(candidate.layout, candidate.sigma, candidate.score)
-                for candidate in population[: self.config.elite_size]
-            ]
-            offspring: list[Candidate] = []
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("[bold blue]Score: {task.fields[score]:.4f}"),
+            TimeRemainingColumn(),
+        ) as progress:
+            task = progress.add_task("Evolving...", total=self.config.generations, score=best.score)
 
-            while len(offspring) < self.config.population_size - self.config.elite_size:
-                parent = self._pick_parent(elites)
-                sigma = self._mutate_sigma(parent.sigma)
+            for _ in range(self.config.generations):
+                elites = [
+                    Candidate(candidate.layout, candidate.sigma, candidate.score)
+                    for candidate in population[: self.config.elite_size]
+                ]
+                offspring: list[Candidate] = []
 
-                if self.rng.random() < self.config.crossover_rate:
-                    partner = self._pick_parent(elites)
-                    child_layout = crossover_layout(parent.layout, partner.layout, self.rng)
-                else:
-                    child_layout = parent.layout
+                while len(offspring) < self.config.population_size - self.config.elite_size:
+                    parent = self._pick_parent(elites)
+                    sigma = self._mutate_sigma(parent.sigma)
 
-                child_layout = mutate_layout(child_layout, self.rng, max(1, round(sigma)))
-                offspring.append(Candidate(child_layout, sigma))
+                    if self.rng.random() < self.config.crossover_rate:
+                        partner = self._pick_parent(elites)
+                        child_layout = crossover_layout(parent.layout, partner.layout, self.rng)
+                    else:
+                        child_layout = parent.layout
 
-            population = elites + offspring
-            self._evaluate(population)
-            population.sort(key=lambda candidate: candidate.score or float("-inf"), reverse=True)
+                    child_layout = mutate_layout(child_layout, self.rng, max(1, round(sigma)))
+                    offspring.append(Candidate(child_layout, sigma))
 
-            if (population[0].score or float("-inf")) > (best.score or float("-inf")):
-                best = Candidate(population[0].layout, population[0].sigma, population[0].score)
+                population = elites + offspring
+                self._evaluate(population)
+                population.sort(key=lambda candidate: candidate.score or float("-inf"), reverse=True)
 
-            history.append(best.score or float("-inf"))
+                if (population[0].score or float("-inf")) > (best.score or float("-inf")):
+                    best = Candidate(population[0].layout, population[0].sigma, population[0].score)
+
+                history.append(best.score or float("-inf"))
+                progress.update(task, advance=1, score=best.score)
 
         return OptimizationResult(
             best_layout=best.layout,
             best_score=best.score or float("-inf"),
-            baseline_layout=QWERTY_LAYOUT,
+            baseline_layout=QWERTY_LAYOUT if self.geometry.name == "staggered" else "N/A",
             baseline_score=baseline_score,
             starting_layout=initial_layout,
             starting_score=starting_score,
@@ -181,6 +204,7 @@ class SelfLearningLayoutAI:
             corpus_tokens=self.corpus.token_count,
             corpus_letters=self.corpus.letter_count,
             config=self.config,
+            geometry_name=self.geometry.name,
         )
 
     def _initial_population(self, initial_layout: str) -> list[Candidate]:
@@ -196,7 +220,7 @@ class SelfLearningLayoutAI:
                 )
                 sigma = self.config.initial_sigma * self.rng.uniform(0.8, 1.2)
             else:
-                layout = random_layout(self.rng)
+                layout = random_layout(self.rng, self.charset, self.geometry)
                 sigma = self.config.initial_sigma * self.rng.uniform(0.6, 1.4)
 
             if layout in seen:
@@ -210,7 +234,7 @@ class SelfLearningLayoutAI:
     def _evaluate(self, population: list[Candidate]) -> None:
         for candidate in population:
             if candidate.score is None:
-                candidate.score = score_layout(candidate.layout, self.corpus)
+                candidate.score = score_layout(candidate.layout, self.geometry, self.corpus)
 
     def _pick_parent(self, candidates: list[Candidate]) -> Candidate:
         total_weight = sum(range(1, len(candidates) + 1))
@@ -228,4 +252,3 @@ class SelfLearningLayoutAI:
     def _mutate_sigma(self, sigma: float) -> float:
         updated = sigma * math.exp(self.config.sigma_learning_rate * self.rng.gauss(0.0, 1.0))
         return min(self.config.max_sigma, max(self.config.min_sigma, updated))
-

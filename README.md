@@ -9,18 +9,26 @@ It does two things:
 
 The result is not a universal "best" layout for every person. It is the best layout the optimizer can find for the corpus and scoring model you give it.
 
+## Installation
+
+Install the project to make the `keyboard-ai` command available:
+
+```bash
+pip install -e .
+```
+
 ## Quick Start
 
 Run the bundled demo corpus:
 
 ```bash
-python3 -m keyboard_ai.cli train --generations 250 --population 64 --seed 7
+keyboard-ai train --generations 250 --population 64 --seed 7
 ```
 
 Paste your own text directly into the terminal:
 
 ```bash
-python3 -m keyboard_ai.cli train --stdin
+keyboard-ai train --stdin
 ```
 
 Type or paste your sample text, then press `Ctrl-D`.
@@ -28,31 +36,31 @@ Type or paste your sample text, then press `Ctrl-D`.
 Train on your own writing:
 
 ```bash
-python3 -m keyboard_ai.cli train --corpus notes.txt chatlog.txt code_comments.txt --generations 400 --population 80 --output artifacts/my-layout.json
+keyboard-ai train --corpus notes.txt chatlog.txt code_comments.txt --generations 400 --population 80 --output artifacts/my-layout.json
 ```
 
 Resume training from a saved model:
 
 ```bash
-python3 -m keyboard_ai.cli train --corpus notes.txt --resume artifacts/my-layout.json --generations 300 --output artifacts/my-layout-v2.json
+keyboard-ai train --corpus notes.txt --resume artifacts/my-layout.json --generations 300 --output artifacts/my-layout-v2.json
 ```
 
 Score any layout string:
 
 ```bash
-python3 -m keyboard_ai.cli score --corpus notes.txt --layout qwertyuiopasdfghjklzxcvbnm
+keyboard-ai score --corpus notes.txt --layout qwertyuiopasdfghjklzxcvbnm
 ```
 
 Score a layout against pasted terminal text:
 
 ```bash
-python3 -m keyboard_ai.cli score --stdin --layout qwertyuiopasdfghjklzxcvbnm
+keyboard-ai score --stdin --layout qwertyuiopasdfghjklzxcvbnm
 ```
 
 Show a layout as rows:
 
 ```bash
-python3 -m keyboard_ai.cli show --layout qwertyuiopasdfghjklzxcvbnm
+keyboard-ai show --layout qwertyuiopasdfghjklzxcvbnm
 ```
 
 ## Layout Format

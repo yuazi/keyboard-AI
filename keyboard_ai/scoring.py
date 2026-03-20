@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import math
 
 from .corpus import CorpusStats
-from .layout import Slot, normalize_layout, slot_map_for_layout
+from .layout import Slot, Geometry
 
 
 @dataclass(frozen=True)
@@ -51,9 +51,10 @@ def _roll_direction(first: Slot, second: Slot, third: Slot) -> int:
     return 0
 
 
-def analyze_layout(layout: str, corpus: CorpusStats) -> LayoutAnalysis:
-    normalize_layout(layout)
-    mapping = slot_map_for_layout(layout)
+def analyze_layout(layout: str, geometry: Geometry, corpus: CorpusStats) -> LayoutAnalysis:
+    # Build mapping from char -> Slot
+    mapping = {char: slot for char, slot in zip(layout, geometry.slots, strict=True)}
+    
     scale = max(corpus.letter_count, 1)
 
     effort_cost = 0.0
@@ -66,9 +67,13 @@ def analyze_layout(layout: str, corpus: CorpusStats) -> LayoutAnalysis:
     redirect_cost = 0.0
 
     for letter, count in corpus.unigrams.items():
-        effort_cost += mapping[letter].effort * count
+        if letter in mapping:
+            effort_cost += mapping[letter].effort * count
 
     for pair, count in corpus.bigrams.items():
+        if pair[0] not in mapping or pair[1] not in mapping:
+            continue
+            
         first = mapping[pair[0]]
         second = mapping[pair[1]]
 
@@ -88,6 +93,9 @@ def analyze_layout(layout: str, corpus: CorpusStats) -> LayoutAnalysis:
         alternation_bonus += 0.30 * count
 
     for trigram, count in corpus.trigrams.items():
+        if trigram[0] not in mapping or trigram[1] not in mapping or trigram[2] not in mapping:
+            continue
+            
         first = mapping[trigram[0]]
         second = mapping[trigram[1]]
         third = mapping[trigram[2]]
@@ -124,6 +132,5 @@ def analyze_layout(layout: str, corpus: CorpusStats) -> LayoutAnalysis:
     )
 
 
-def score_layout(layout: str, corpus: CorpusStats) -> float:
-    return analyze_layout(layout, corpus).score
-
+def score_layout(layout: str, geometry: Geometry, corpus: CorpusStats) -> float:
+    return analyze_layout(layout, geometry, corpus).score

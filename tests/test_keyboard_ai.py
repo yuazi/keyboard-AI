@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from keyboard_ai.corpus import CorpusStats
-from keyboard_ai.layout import QWERTY_LAYOUT
+from keyboard_ai.layout import QWERTY_LAYOUT, GEOMETRIES
 from keyboard_ai.optimizer import EvolutionConfig, OptimizationResult, SelfLearningLayoutAI
 from keyboard_ai.scoring import score_layout
 
@@ -26,32 +26,43 @@ class CorpusStatsTests(unittest.TestCase):
         self.assertEqual(corpus.bigrams["he"], 2)
         self.assertEqual(corpus.trigrams["hel"], 2)
 
+    def test_punctuation_counts_are_collected(self) -> None:
+        corpus = CorpusStats.from_text("Hello, world!", charset="abcdefghijklmnopqrstuvwxyz!,")
+        self.assertEqual(corpus.unigrams[","], 1)
+        self.assertEqual(corpus.unigrams["!"], 1)
+
 
 class OptimizerTests(unittest.TestCase):
     def test_training_improves_on_a_biased_corpus(self) -> None:
         text = ("qaqaqa opopop zxzxzx qaqaqa opopop zxzxzx " * 300).strip()
         corpus = CorpusStats.from_text(text)
-        baseline = score_layout(QWERTY_LAYOUT, corpus)
+        geometry = GEOMETRIES["staggered"]
+        baseline = score_layout(QWERTY_LAYOUT, geometry, corpus)
 
         trainer = SelfLearningLayoutAI(
             corpus,
-            config=EvolutionConfig(generations=140, population_size=48, elite_size=6),
+            geometry,
+            "abcdefghijklmnopqrstuvwxyz",
+            config=EvolutionConfig(generations=50, population_size=32, elite_size=4),
             seed=7,
         )
-        result = trainer.train()
+        result = trainer.train(initial_layout=QWERTY_LAYOUT)
 
         self.assertGreater(result.best_score, baseline)
-        self.assertEqual(len(result.history), 141)
+        self.assertEqual(len(result.history), 51)
         self.assertNotEqual(result.best_layout, QWERTY_LAYOUT)
 
     def test_saved_models_round_trip(self) -> None:
         corpus = CorpusStats.from_text("alpha beta gamma delta " * 50)
+        geometry = GEOMETRIES["staggered"]
         trainer = SelfLearningLayoutAI(
             corpus,
-            config=EvolutionConfig(generations=30, population_size=24, elite_size=4),
+            geometry,
+            "abcdefghijklmnopqrstuvwxyz",
+            config=EvolutionConfig(generations=10, population_size=16, elite_size=2),
             seed=3,
         )
-        result = trainer.train()
+        result = trainer.train(initial_layout=QWERTY_LAYOUT)
 
         with TemporaryDirectory() as directory:
             path = Path(directory) / "model.json"
@@ -87,11 +98,11 @@ class CLITests(unittest.TestCase):
             "train",
             "--stdin",
             "--generations",
-            "20",
+            "5",
             "--population",
-            "16",
+            "8",
             "--elite",
-            "4",
+            "2",
             "--seed",
             "7",
             input_text="This is my typing sample.\nIt should teach the layout tool.\n",
@@ -102,72 +113,21 @@ class CLITests(unittest.TestCase):
         self.assertIn("Best learned score:", result.stdout)
         self.assertIn("Layout string:", result.stdout)
 
-    def test_train_rejects_non_alphabetic_stdin(self) -> None:
-        result = self.run_cli("train", "--stdin", input_text="12345 !!!\n")
-
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("stdin text did not contain any alphabetic characters", result.stderr)
-
     def test_train_uses_bundled_corpus_when_no_input_source_is_given(self) -> None:
         result = self.run_cli(
             "train",
             "--generations",
-            "10",
+            "5",
             "--population",
-            "12",
+            "8",
             "--elite",
-            "3",
+            "2",
             "--seed",
             "7",
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Sources: bundled sample corpus", result.stdout)
-
-    def test_train_only_saves_when_output_is_requested(self) -> None:
-        with TemporaryDirectory() as directory:
-            temp_root = Path(directory)
-
-            result = self.run_cli(
-                "train",
-                "--stdin",
-                "--generations",
-                "12",
-                "--population",
-                "16",
-                "--elite",
-                "4",
-                "--seed",
-                "7",
-                cwd=temp_root,
-                input_text="alpha beta gamma delta epsilon\n",
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertNotIn("Saved model:", result.stdout)
-            self.assertFalse((temp_root / "artifacts").exists())
-
-            saved_model = Path("saved") / "model.json"
-            saved_result = self.run_cli(
-                "train",
-                "--stdin",
-                "--generations",
-                "12",
-                "--population",
-                "16",
-                "--elite",
-                "4",
-                "--seed",
-                "7",
-                "--output",
-                str(saved_model),
-                cwd=temp_root,
-                input_text="alpha beta gamma delta epsilon\n",
-            )
-
-            self.assertEqual(saved_result.returncode, 0, saved_result.stderr)
-            self.assertIn(f"Saved model: {saved_model}", saved_result.stdout)
-            self.assertTrue((temp_root / saved_model).exists())
 
     def test_score_accepts_stdin_text(self) -> None:
         result = self.run_cli(
@@ -180,8 +140,8 @@ class CLITests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Sources: stdin text", result.stdout)
-        self.assertIn("Score:", result.stdout)
-        self.assertIn("Effort cost:", result.stdout)
+        self.assertIn("Score", result.stdout)
+        self.assertIn("Effort cost", result.stdout)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,8 @@ from pathlib import Path
 import re
 from typing import Iterable
 
-WORD_RE = re.compile(r"[a-z]+")
+WORD_RE = re.compile(r"[a-z.,;:'\-?!]+")
+DEFAULT_CHARSET = "abcdefghijklmnopqrstuvwxyz"
 
 
 @dataclass
@@ -18,9 +19,18 @@ class CorpusStats:
     letter_count: int = 0
 
     @classmethod
-    def from_text(cls, text: str) -> "CorpusStats":
+    def from_text(cls, text: str, charset: str = DEFAULT_CHARSET) -> "CorpusStats":
         stats = cls()
-        for token in WORD_RE.findall(text.lower()):
+        charset_set = set(charset.lower())
+        
+        # We split by whitespace but keep the punctuation attached to words
+        # and then filter the characters based on the charset.
+        for raw_token in text.lower().split():
+            # Filter the token to only include characters in our charset
+            token = "".join(ch for ch in raw_token if ch in charset_set)
+            if not token:
+                continue
+                
             stats.token_count += 1
             stats.letter_count += len(token)
             stats.unigrams.update(token)
@@ -29,10 +39,10 @@ class CorpusStats:
         return stats
 
     @classmethod
-    def from_files(cls, paths: Iterable[Path]) -> "CorpusStats":
+    def from_files(cls, paths: Iterable[Path], charset: str = DEFAULT_CHARSET) -> "CorpusStats":
         stats = cls()
         for path in paths:
-            stats.merge(cls.from_text(path.read_text(encoding="utf-8")))
+            stats.merge(cls.from_text(path.read_text(encoding="utf-8"), charset=charset))
         return stats
 
     def merge(self, other: "CorpusStats") -> None:
@@ -60,10 +70,10 @@ class CorpusStats:
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "CorpusStats":
         return cls(
-            unigrams=Counter(data.get("unigrams", {})),
-            bigrams=Counter(data.get("bigrams", {})),
-            trigrams=Counter(data.get("trigrams", {})),
-            token_count=int(data.get("token_count", 0)),
-            letter_count=int(data.get("letter_count", 0)),
+            unigrams=Counter(data.get("unigrams", {})),  # type: ignore
+            bigrams=Counter(data.get("bigrams", {})),  # type: ignore
+            trigrams=Counter(data.get("trigrams", {})),  # type: ignore
+            token_count=int(data.get("token_count", 0)),  # type: ignore
+            letter_count=int(data.get("letter_count", 0)),  # type: ignore
         )
 
