@@ -1,23 +1,33 @@
 # Keyboard AI
 
-`Keyboard AI` is a self-learning keyboard layout optimizer.
+`keyboard-ai` is a self-learning keyboard layout optimizer for English text. It analyzes your writing, learns character patterns, and evolves alternative layouts that aim to reduce strain and improve typing comfort.
 
-It does two things:
+It does two main things:
 
-1. It learns the character patterns in a text corpus by building unigram, bigram, and trigram statistics.
-2. It evolves keyboard layouts to minimize an ergonomic cost model that rewards easy keys, hand alternation, and smooth finger rolls while penalizing same-finger stretches and awkward redirects.
+- Learns character patterns from a text corpus by building unigram, bigram, and trigram statistics.
+- Evolves keyboard layouts to minimize an ergonomic cost model that rewards easy keys, hand alternation, and smooth finger rolls, while penalizing same-finger stretches and awkward redirects.
 
-The result is not a universal "best" layout for every person. It is the best layout the optimizer can find for the corpus and scoring model you give it.
+The result is not a universal "best" layout for everyone, but the best layout the optimizer can find for the corpus and scoring model you give it.
 
 ## Installation
 
-Install the project to make the `keyboard-ai` command available:
+From source (editable install):
 
 ```bash
+git clone https://github.com/yuazi/keyboard-AI.git
+cd keyboard-AI
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
-## Quick Start
+You can then run the CLI via:
+
+```bash
+keyboard-ai --help
+```
+
+## Quick start
 
 Run the bundled demo corpus:
 
@@ -31,7 +41,7 @@ Paste your own text directly into the terminal:
 keyboard-ai train --stdin
 ```
 
-Type or paste your sample text, then press `Ctrl-D`.
+Type or paste your sample text, then press `Ctrl-D` (Unix/macOS) to start training.
 
 Train on your own writing:
 
@@ -63,29 +73,41 @@ Show a layout as rows:
 keyboard-ai show --layout qwertyuiopasdfghjklzxcvbnm
 ```
 
-## Layout Format
+---
 
-Layouts are encoded as 26 letters in physical key order:
+## Layout format
+
+Layouts are encoded as 26 lowercase letters in physical key order:
 
 `top row (10)` + `home row (9)` + `bottom row (7)`
 
-Example:
+Example (QWERTY):
 
-`qwertyuiopasdfghjklzxcvbnm`
+```text
+qwertyuiopasdfghjklzxcvbnm
+```
+
+This format is accepted by the `train`, `score`, and `show` commands wherever a `--layout` argument is used.
+
+---
 
 ## Commands
 
-- `train`: learn from a corpus and search for a better layout
-- `score`: inspect the score and ergonomic breakdown of a layout
-- `show`: print a layout from a raw string or a saved model
+`keyboard-ai` currently exposes three CLI commands:
+
+- `train`: Learn from a corpus and search for a better layout.
+- `score`: Inspect the score and ergonomic breakdown of a layout.
+- `show`: Print a layout from a raw string or a saved model.
 
 `train` and `score` can learn from:
 
 - `--corpus file1.txt file2.txt`
 - `--stdin` for pasted terminal text
-- no custom source, which falls back to the bundled sample corpus
+- No custom source, which falls back to the bundled sample corpus.
 
-Models are only saved when `--output <path>` is provided.
+Models are only saved when `--output` is provided.
+
+---
 
 ## Verification
 
@@ -94,3 +116,20 @@ Run the test suite with:
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+---
+
+## Roadmap
+
+Planned improvements:
+
+- Better default ergonomic model and tunable weights.
+- Support for additional characters and symbols beyond 26 letters.
+- Visualization of layouts and score breakdowns.
+- Configurable optimization strategies and search parameters.
+
+---
+
+## License
+
+MIT License. See `LICENSE` for details.
