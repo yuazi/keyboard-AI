@@ -28,7 +28,7 @@ keyboard-ai --help
 
 ## Quick start
 
-### 1. Training a layout
+### Training a layout
 You can train a layout on the **bundled sample corpus** with:
 ```bash
 keyboard-ai train --generations 250 --population 64
@@ -37,17 +37,6 @@ keyboard-ai train --generations 250 --population 64
 Or paste your own writing directly (Ctrl-D when finished):
 ```bash
 keyboard-ai train --stdin
-```
-
-### 2. Scoring & Inspection
-Evaluate a specific layout string:
-```bash
-keyboard-ai score --corpus my_writing.txt --layout qwertyuiopasdfghjklzxcvbnm
-```
-
-Visualize it as rows:
-```bash
-keyboard-ai show --layout qwertyuiopasdfghjklzxcvbnm
 ```
 
 ---
