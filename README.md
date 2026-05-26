@@ -1,101 +1,159 @@
 # Keyboard AI
 
-`keyboard-ai` is a self-learning keyboard layout optimizer for English text. It analyzes your writing, learns character patterns, and evolves alternative layouts that aim to reduce strain and improve typing comfort.
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![CI](https://github.com/yuazi/keyboard-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/yuazi/keyboard-AI/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-It does two main things:
+`keyboard-ai` is a Python CLI that learns character patterns from text and searches for keyboard layouts with lower ergonomic cost. It combines corpus analysis, evolutionary optimization, layout scoring, and export helpers in a small package-style project.
 
-- Learns character patterns from a text corpus by building unigram, bigram, and trigram statistics.
-- Evolves keyboard layouts to minimize an ergonomic cost model that rewards easy keys, hand alternation, and smooth finger rolls, while penalizing same-finger stretches and awkward redirects.
+This is not a claim to find a universal "best" keyboard layout. The tool finds the best layout it can for the corpus, geometry, character set, and scoring model you give it.
 
-The result is not a universal "best" layout for everyone, but the best layout the optimizer can find for the corpus and scoring model you give it.
+## What It Demonstrates
+
+- Corpus ingestion from files, stdin, or a bundled sample text.
+- Unigram, bigram, and trigram statistics for layout scoring.
+- Evolutionary search with configurable generations, population size, elite count, mutation strength, and seed.
+- Ergonomic scoring for effort, same-finger movement, same-hand usage, row jumps, repetition, alternation, rolls, and redirects.
+- Support for staggered and ortholinear keyboard geometries.
+- Saved model JSON output plus export helpers for Karabiner and QMK-style configs.
+- Regression tests for corpus statistics, training behavior, saved-model round trips, and CLI flows.
 
 ## Installation
-
-The easiest way to set up the project locally for development is to install it in "editable" mode. This makes the `keyboard-ai` command available everywhere in your terminal:
 
 ```bash
 git clone https://github.com/yuazi/keyboard-AI.git
 cd keyboard-AI
-pip install -e .
+python3 -m pip install -e .
 ```
 
-After installing, check that it's working:
+Check that the CLI is available:
+
 ```bash
 keyboard-ai --help
 ```
 
----
+## Quick Start
 
-## Quick start
+Train against the bundled sample corpus:
 
-### Training a layout
-You can train a layout on the **bundled sample corpus** with:
 ```bash
 keyboard-ai train --generations 250 --population 64
 ```
 
-Or paste your own writing directly (Ctrl-D when finished):
+Train from pasted text:
+
 ```bash
 keyboard-ai train --stdin
 ```
 
----
+Train from one or more text files and save the learned model:
 
-## Layout format
+```bash
+keyboard-ai train --corpus notes.txt emails.txt --output model.json
+```
 
-Layouts are encoded as 26 lowercase letters in physical key order:
+Score an existing layout:
 
-`top row (10)` + `home row (9)` + `bottom row (7)`
+```bash
+keyboard-ai score --layout qwertyuiopasdfghjklzxcvbnm --corpus notes.txt
+```
 
-Example (QWERTY):
+Render a saved model or layout:
+
+```bash
+keyboard-ai show --model model.json
+keyboard-ai show --layout qwertyuiopasdfghjklzxcvbnm
+```
+
+Export a layout:
+
+```bash
+keyboard-ai export --model model.json --format karabiner --output karabiner.json
+keyboard-ai export --model model.json --format qmk --output qmk_keymap.c
+```
+
+## Layout Format
+
+For the default staggered geometry, layouts are encoded as 26 lowercase letters in physical key order:
+
+```text
+top row (10) + home row (9) + bottom row (7)
+```
+
+QWERTY example:
 
 ```text
 qwertyuiopasdfghjklzxcvbnm
 ```
 
-This format is accepted by the `train`, `score`, and `show` commands wherever a `--layout` argument is used.
+The CLI also supports an `ortho` geometry for 30 slots. If the provided character set is shorter than the geometry, the optimizer pads remaining slots with spaces.
 
----
+## CLI Reference
 
-`keyboard-ai` currently exposes two main commands:
+| Command | Purpose |
+| --- | --- |
+| `keyboard-ai train` | Learn a layout from a corpus, stdin, or the bundled sample text. |
+| `keyboard-ai score` | Score an existing layout against a corpus. |
+| `keyboard-ai show` | Print a layout or saved model in a readable form. |
+| `keyboard-ai export` | Export a layout or saved model to Karabiner or QMK output. |
 
-- `train`: Search for a better layout by learning from text.
-- `export`: Generate configuration files for external tools.
+Common training flags:
 
-### Input Sources
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--corpus` | bundled sample | One or more text files to learn from. |
+| `--stdin` | false | Read training text from standard input. |
+| `--layout` | QWERTY | Starting layout string. |
+| `--resume` | none | Continue from a saved model JSON file. |
+| `--geometry` | `staggered` | Keyboard geometry: `staggered` or `ortho`. |
+| `--charset` | alphabet / geometry-aware default | Characters included in optimization. |
+| `--generations` | `300` | Evolutionary search generations. |
+| `--population` | `64` | Candidate layouts per generation. |
+| `--elite` | `8` | Best candidates preserved per generation. |
+| `--sigma` | `3.0` | Initial mutation strength. |
+| `--seed` | `7` | Deterministic random seed. |
+| `--output` | none | Save learned model JSON. |
 
-`train` and `score` can learn from:
+## Project Structure
 
-- `--corpus file1.txt file2.txt` (local files)
-- `--stdin` (pasted text in terminal)
-- *Default*: The bundled sample corpus if no input is given.
+```text
+.
+├── keyboard_ai/
+│   ├── cli.py          # argparse CLI and Rich output
+│   ├── corpus.py       # text ingestion and n-gram statistics
+│   ├── export.py       # Karabiner and QMK export helpers
+│   ├── layout.py       # keyboard geometries and layout operations
+│   ├── optimizer.py    # evolutionary search and saved model format
+│   ├── scoring.py      # ergonomic cost model
+│   └── sample_corpus.txt
+├── tests/
+│   └── test_keyboard_ai.py
+├── pyproject.toml
+└── README.md
+```
 
-Models are only saved when you provide the `--output` flag.
+## Development
 
----
+Run the test suite:
 
-## Development & Verification
-
-I've set up some modern tools to keep the code clean and correct:
-
-### Run Tests
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
----
+Install locally in editable mode before testing the command-line entry point:
+
+```bash
+python3 -m pip install -e .
+keyboard-ai train --generations 5 --population 8
+```
 
 ## Roadmap
 
-Planned improvements:
-
-- Better default ergonomic model and tunable weights.
-- Support for additional characters and symbols beyond 26 letters.
-- Visualization of layouts and score breakdowns.
-- Configurable optimization strategies and search parameters.
-
----
+- Tune the ergonomic weights with better empirical defaults.
+- Add visual score breakdowns for learned layouts.
+- Improve duplicate/filler handling for larger custom character sets.
+- Add more export targets and example configs.
 
 ## License
 
-MIT License. See `LICENSE` for details.
+MIT License. See [LICENSE](LICENSE) for details.

@@ -6,7 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "keyboard-AI"
 version = "0.1.0"
 description = "Self-learning keyboard layout optimizer"
+readme = "README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
 dependencies = [
     "rich>=13.7.0",
 ]
@@ -19,4 +21,3 @@ include = ["keyboard_ai*"]
 
 [tool.setuptools.package-data]
 keyboard_ai = ["sample_corpus.txt"]
-

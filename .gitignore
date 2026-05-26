@@ -22,6 +22,9 @@ var/
 venv/
 ENV/
 
+# macOS
+.DS_Store
+
 # Project-specific artifacts
 artifacts/
 
