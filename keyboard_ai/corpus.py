@@ -3,10 +3,8 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-import re
 from typing import Iterable
 
-WORD_RE = re.compile(r"[a-z.,;:'\-?!]+")
 DEFAULT_CHARSET = "abcdefghijklmnopqrstuvwxyz"
 
 
@@ -51,29 +49,3 @@ class CorpusStats:
         self.trigrams.update(other.trigrams)
         self.token_count += other.token_count
         self.letter_count += other.letter_count
-
-    def top_unigrams(self, limit: int = 8) -> list[tuple[str, int]]:
-        return self.unigrams.most_common(limit)
-
-    def top_bigrams(self, limit: int = 8) -> list[tuple[str, int]]:
-        return self.bigrams.most_common(limit)
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "unigrams": dict(self.unigrams),
-            "bigrams": dict(self.bigrams),
-            "trigrams": dict(self.trigrams),
-            "token_count": self.token_count,
-            "letter_count": self.letter_count,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "CorpusStats":
-        return cls(
-            unigrams=Counter(data.get("unigrams", {})),  # type: ignore
-            bigrams=Counter(data.get("bigrams", {})),  # type: ignore
-            trigrams=Counter(data.get("trigrams", {})),  # type: ignore
-            token_count=int(data.get("token_count", 0)),  # type: ignore
-            letter_count=int(data.get("letter_count", 0)),  # type: ignore
-        )
-

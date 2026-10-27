@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import random
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
 
 from keyboard_ai.corpus import CorpusStats
-from keyboard_ai.layout import QWERTY_LAYOUT, GEOMETRIES
+from keyboard_ai.layout import QWERTY_LAYOUT, GEOMETRIES, crossover_layout
 from keyboard_ai.optimizer import EvolutionConfig, OptimizationResult, SelfLearningLayoutAI
 from keyboard_ai.scoring import score_layout
 
@@ -72,6 +73,24 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(restored.best_layout, result.best_layout)
         self.assertEqual(restored.generations, result.generations)
         self.assertAlmostEqual(restored.best_score, result.best_score)
+
+    def test_crossover_keeps_every_character_including_repeated_filler(self) -> None:
+        parent = "abcdefghijklmnopqrstuvwxyz    "
+        rng = random.Random(1)
+        for _ in range(200):
+            other = list(parent)
+            rng.shuffle(other)
+            child = crossover_layout(parent, "".join(other), rng)
+            self.assertEqual(sorted(child), sorted(parent))
+
+    def test_starting_layout_must_match_charset(self) -> None:
+        trainer = SelfLearningLayoutAI(
+            CorpusStats.from_text("alpha beta"),
+            GEOMETRIES["staggered"],
+            "abcdefghijklmnopqrstuvwxy;",
+        )
+        with self.assertRaises(ValueError):
+            trainer.train(initial_layout=QWERTY_LAYOUT)
 
 
 class CLITests(unittest.TestCase):
@@ -142,6 +161,28 @@ class CLITests(unittest.TestCase):
         self.assertIn("Sources: stdin text", result.stdout)
         self.assertIn("Score", result.stdout)
         self.assertIn("Effort cost", result.stdout)
+
+    def test_train_rejects_corpus_file_without_charset_characters(self) -> None:
+        with TemporaryDirectory() as directory:
+            corpus = Path(directory) / "digits.txt"
+            corpus.write_text("12345 67890\n", encoding="utf-8")
+            result = self.run_cli("train", "--corpus", str(corpus), "--generations", "2")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("did not contain any characters", result.stdout)
+
+    def test_ortho_training_keeps_all_letters_and_resumes(self) -> None:
+        fast = ("--generations", "3", "--population", "8", "--elite", "2")
+        with TemporaryDirectory() as directory:
+            model = Path(directory) / "ortho.json"
+            trained = self.run_cli("train", "--geometry", "ortho", *fast, "--output", str(model))
+            resumed = self.run_cli("train", "--resume", str(model), *fast)
+            layout = OptimizationResult.from_file(model).best_layout
+
+        self.assertEqual(trained.returncode, 0, trained.stdout)
+        self.assertTrue(set("abcdefghijklmnopqrstuvwxyz") <= set(layout), layout)
+        self.assertEqual(resumed.returncode, 0, resumed.stdout)
+        self.assertIn("Geometry: ortho", resumed.stdout)
 
 
 if __name__ == "__main__":

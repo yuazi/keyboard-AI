@@ -4,7 +4,7 @@ import argparse
 from importlib import resources
 from pathlib import Path
 import sys
-from typing import Iterable, Optional
+from typing import Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -12,7 +12,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from .corpus import CorpusStats, DEFAULT_CHARSET
-from .layout import QWERTY_LAYOUT, GEOMETRIES, Geometry
+from .layout import GEOMETRIES, Geometry
 from .optimizer import EvolutionConfig, OptimizationResult, SelfLearningLayoutAI
 from .scoring import analyze_layout
 from .export import export_karabiner, export_qmk
@@ -37,20 +37,20 @@ def _read_stdin_text() -> str:
 
 def _load_corpus(paths: list[str] | None, charset: str, use_stdin: bool = False) -> tuple[CorpusStats, list[str]]:
     if use_stdin:
-        corpus = CorpusStats.from_text(_read_stdin_text(), charset=charset)
-        if corpus.letter_count == 0:
-            raise CorpusInputError(f"stdin text did not contain any characters from charset: {charset}")
-        return corpus, ["stdin text"]
+        corpus, sources = CorpusStats.from_text(_read_stdin_text(), charset=charset), ["stdin text"]
+    elif paths:
+        resolved = [Path(path).expanduser().resolve() for path in paths]
+        corpus, sources = CorpusStats.from_files(resolved, charset=charset), [str(path) for path in resolved]
+    else:
+        corpus, sources = _resource_corpus(charset), ["bundled sample corpus"]
 
-    if not paths:
-        return _resource_corpus(charset), ["bundled sample corpus"]
-
-    resolved = [Path(path).expanduser().resolve() for path in paths]
-    return CorpusStats.from_files(resolved, charset=charset), [str(path) for path in resolved]
+    if corpus.letter_count == 0:
+        raise CorpusInputError(f"{', '.join(sources)} did not contain any characters from charset: {charset.strip()}")
+    return corpus, sources
 
 
-def _format_top_items(items: Iterable[tuple[str, int]]) -> str:
-    return ", ".join(f"[bold cyan]{item}[/bold cyan]:{count}" for item, count in items)
+def _geometry_for(layout: str) -> Geometry | None:
+    return next((geometry for geometry in GEOMETRIES.values() if geometry.slot_count == len(layout)), None)
 
 
 def render_layout(layout: str, geometry: Geometry, corpus: Optional[CorpusStats] = None) -> Panel:
@@ -92,13 +92,16 @@ def render_layout(layout: str, geometry: Geometry, corpus: Optional[CorpusStats]
 
 
 def cmd_train(args: argparse.Namespace) -> int:
-    geometry = GEOMETRIES.get(args.geometry)
+    saved = OptimizationResult.from_file(Path(args.resume)) if args.resume is not None else None
+    geometry_name = saved.geometry_name if saved else args.geometry
+    geometry = GEOMETRIES.get(geometry_name)
     if not geometry:
-        console.print(f"[red]Error: Unknown geometry '{args.geometry}'[/red]")
+        console.print(f"[red]Error: Unknown geometry '{geometry_name}'[/red]")
         return 1
-        
-    charset = args.charset or (DEFAULT_CHARSET if args.geometry == "staggered" else "".join(sorted(set(DEFAULT_CHARSET + ".,;:'-?!"))))
-    
+
+    # Letters first, so trimming to the slot count drops punctuation, never letters.
+    charset = args.charset or (saved.best_layout if saved else DEFAULT_CHARSET + ".,;:'-?!")
+
     if len(charset) < geometry.slot_count:
         charset = charset.ljust(geometry.slot_count)
     elif len(charset) > geometry.slot_count:
@@ -110,12 +113,7 @@ def cmd_train(args: argparse.Namespace) -> int:
         console.print(f"[red]Error: {e}[/red]")
         return 1
 
-    initial_layout = args.layout
-    if args.resume is not None:
-        saved = OptimizationResult.from_file(Path(args.resume))
-        initial_layout = saved.best_layout
-    elif initial_layout == QWERTY_LAYOUT and args.geometry != "staggered":
-        initial_layout = None
+    initial_layout = saved.best_layout if saved else args.layout
 
     config = EvolutionConfig(
         generations=args.generations,
@@ -155,12 +153,7 @@ def cmd_train(args: argparse.Namespace) -> int:
 
 
 def cmd_score(args: argparse.Namespace) -> int:
-    geometry = None
-    for g in GEOMETRIES.values():
-        if g.slot_count == len(args.layout):
-            geometry = g
-            break
-    
+    geometry = _geometry_for(args.layout)
     if not geometry:
         console.print(f"[red]Error: No geometry found for layout of length {len(args.layout)}[/red]")
         return 1
@@ -197,17 +190,12 @@ def cmd_show(args: argparse.Namespace) -> int:
         geometry = GEOMETRIES.get(res.geometry_name, GEOMETRIES["staggered"])
     else:
         layout = args.layout
-        geometry = None
-        for g in GEOMETRIES.values():
-            if g.slot_count == len(layout):
-                geometry = g
-                break
+        geometry = _geometry_for(layout)
         if not geometry:
             console.print(f"[red]Error: Unknown layout length {len(layout)}[/red]")
             return 1
 
-    if geometry:
-        console.print(render_layout(layout, geometry))
+    console.print(render_layout(layout, geometry))
     console.print()
     console.print(f"[bold cyan]{layout}[/bold cyan]")
     return 0
@@ -244,7 +232,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_inputs = train_parser.add_mutually_exclusive_group()
     train_inputs.add_argument("--corpus", nargs="+", help="text files to learn from")
     train_inputs.add_argument("--stdin", action="store_true", help="read text from standard input")
-    train_parser.add_argument("--layout", default=QWERTY_LAYOUT, help="starting layout string")
+    train_parser.add_argument("--layout", help="starting layout string (default: QWERTY when it fits the charset, else random)")
     train_parser.add_argument("--resume", help="resume from a saved model JSON file")
     train_parser.add_argument("--geometry", default="staggered", choices=list(GEOMETRIES.keys()))
     train_parser.add_argument("--charset", help="characters to include in optimization")

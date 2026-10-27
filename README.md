@@ -4,19 +4,17 @@
 [![CI](https://github.com/yuazi/keyboard-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/yuazi/keyboard-AI/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-`keyboard-ai` is a Python CLI that learns character patterns from text and searches for keyboard layouts with lower ergonomic cost. It combines corpus analysis, evolutionary optimization, layout scoring, and export helpers in a small package-style project.
+`keyboard-ai` is a Python CLI that counts character patterns in your text and runs an evolutionary search for a keyboard layout with a lower ergonomic cost. The result depends on the corpus, geometry, character set and scoring model you give it, so treat it as a layout tuned to your text and to this cost model.
 
-This is not a claim to find a universal "best" keyboard layout. The tool finds the best layout it can for the corpus, geometry, character set, and scoring model you give it.
-
-## What It Demonstrates
+## Features
 
 - Corpus ingestion from files, stdin, or a bundled sample text.
 - Unigram, bigram, and trigram statistics for layout scoring.
 - Evolutionary search with configurable generations, population size, elite count, mutation strength, and seed.
 - Ergonomic scoring for effort, same-finger movement, same-hand usage, row jumps, repetition, alternation, rolls, and redirects.
 - Support for staggered and ortholinear keyboard geometries.
-- Saved model JSON output plus export helpers for Karabiner and QMK-style configs.
-- Regression tests for corpus statistics, training behavior, saved-model round trips, and CLI flows.
+- Saved model JSON, plus export to a Karabiner remapping rule or a QMK comment block showing the layout.
+- Tests for corpus statistics, training, crossover, saved-model round trips and the CLI.
 
 ## Installation
 
@@ -32,7 +30,7 @@ Check that the CLI is available:
 keyboard-ai --help
 ```
 
-## Quick Start
+## Quick start
 
 Train against the bundled sample corpus:
 
@@ -72,7 +70,7 @@ keyboard-ai export --model model.json --format karabiner --output karabiner.json
 keyboard-ai export --model model.json --format qmk --output qmk_keymap.c
 ```
 
-## Layout Format
+## Layout format
 
 For the default staggered geometry, layouts are encoded as 26 lowercase letters in physical key order:
 
@@ -86,16 +84,16 @@ QWERTY example:
 qwertyuiopasdfghjklzxcvbnm
 ```
 
-The CLI also supports an `ortho` geometry for 30 slots. If the provided character set is shorter than the geometry, the optimizer pads remaining slots with spaces.
+The `ortho` geometry has 30 slots. Its default character set is the 26 letters plus `.,;:`. If your `--charset` is shorter than the geometry, the extra slots become blank keys (spaces). To continue training, pass `--resume model.json`; it picks up the saved model's geometry and characters.
 
-## CLI Reference
+## CLI reference
 
 | Command | Purpose |
 | --- | --- |
 | `keyboard-ai train` | Learn a layout from a corpus, stdin, or the bundled sample text. |
 | `keyboard-ai score` | Score an existing layout against a corpus. |
 | `keyboard-ai show` | Print a layout or saved model in a readable form. |
-| `keyboard-ai export` | Export a layout or saved model to Karabiner or QMK output. |
+| `keyboard-ai export` | Write a layout or saved model as a Karabiner rule or a QMK comment block. |
 
 Common training flags:
 
@@ -103,10 +101,10 @@ Common training flags:
 | --- | --- | --- |
 | `--corpus` | bundled sample | One or more text files to learn from. |
 | `--stdin` | false | Read training text from standard input. |
-| `--layout` | QWERTY | Starting layout string. |
+| `--layout` | QWERTY, or random if the charset isn't the 26 letters | Starting layout string. It must use exactly the charset's characters. |
 | `--resume` | none | Continue from a saved model JSON file. |
 | `--geometry` | `staggered` | Keyboard geometry: `staggered` or `ortho`. |
-| `--charset` | alphabet / geometry-aware default | Characters included in optimization. |
+| `--charset` | letters, plus `.,;:` on ortho | Characters included in optimization. |
 | `--generations` | `300` | Evolutionary search generations. |
 | `--population` | `64` | Candidate layouts per generation. |
 | `--elite` | `8` | Best candidates preserved per generation. |
@@ -114,14 +112,14 @@ Common training flags:
 | `--seed` | `7` | Deterministic random seed. |
 | `--output` | none | Save learned model JSON. |
 
-## Project Structure
+## Project structure
 
 ```text
 .
 ├── keyboard_ai/
 │   ├── cli.py          # argparse CLI and Rich output
 │   ├── corpus.py       # text ingestion and n-gram statistics
-│   ├── export.py       # Karabiner and QMK export helpers
+│   ├── export.py       # Karabiner and QMK export
 │   ├── layout.py       # keyboard geometries and layout operations
 │   ├── optimizer.py    # evolutionary search and saved model format
 │   ├── scoring.py      # ergonomic cost model
@@ -151,7 +149,7 @@ keyboard-ai train --generations 5 --population 8
 
 - Tune the ergonomic weights with better empirical defaults.
 - Add visual score breakdowns for learned layouts.
-- Improve duplicate/filler handling for larger custom character sets.
+- Export a full QMK keymap instead of a comment block.
 - Add more export targets and example configs.
 
 ## License
