@@ -137,20 +137,24 @@ class SelfLearningLayoutAI:
             raise ValueError("population_size must be at least 4")
         if not 1 <= self.config.elite_size < self.config.population_size:
             raise ValueError("elite_size must be between 1 and population_size - 1")
+        if len(charset) != geometry.slot_count:
+            raise ValueError(f"charset must have exactly {geometry.slot_count} characters (pad with spaces)")
 
     def train(self, initial_layout: Optional[str] = None) -> OptimizationResult:
         if initial_layout is None:
-            initial_layout = QWERTY_LAYOUT if self.geometry.name == "staggered" else random_layout(self.rng, self.charset, self.geometry)
-            
+            initial_layout = QWERTY_LAYOUT if sorted(self.charset) == sorted(QWERTY_LAYOUT) else random_layout(self.rng, self.charset)
+        if sorted(initial_layout) != sorted(self.charset):
+            raise ValueError("starting layout must use exactly the characters in the charset")
+
         baseline_score = score_layout(QWERTY_LAYOUT, GEOMETRIES["staggered"], self.corpus) if self.geometry.name == "staggered" else 0.0
         starting_score = score_layout(initial_layout, self.geometry, self.corpus)
 
         population = self._initial_population(initial_layout)
         self._evaluate(population)
-        population.sort(key=lambda candidate: candidate.score or float("-inf"), reverse=True)
+        population.sort(key=lambda candidate: candidate.score, reverse=True)
 
         best = Candidate(population[0].layout, population[0].sigma, population[0].score)
-        history = [best.score or float("-inf")]
+        history = [best.score]
 
         with Progress(
             TextColumn("[progress.description]{task.description}"),
@@ -183,17 +187,17 @@ class SelfLearningLayoutAI:
 
                 population = elites + offspring
                 self._evaluate(population)
-                population.sort(key=lambda candidate: candidate.score or float("-inf"), reverse=True)
+                population.sort(key=lambda candidate: candidate.score, reverse=True)
 
-                if (population[0].score or float("-inf")) > (best.score or float("-inf")):
+                if population[0].score > best.score:
                     best = Candidate(population[0].layout, population[0].sigma, population[0].score)
 
-                history.append(best.score or float("-inf"))
+                history.append(best.score)
                 progress.update(task, advance=1, score=best.score)
 
         return OptimizationResult(
             best_layout=best.layout,
-            best_score=best.score or float("-inf"),
+            best_score=best.score,
             baseline_layout=QWERTY_LAYOUT if self.geometry.name == "staggered" else "N/A",
             baseline_score=baseline_score,
             starting_layout=initial_layout,
@@ -220,7 +224,7 @@ class SelfLearningLayoutAI:
                 )
                 sigma = self.config.initial_sigma * self.rng.uniform(0.8, 1.2)
             else:
-                layout = random_layout(self.rng, self.charset, self.geometry)
+                layout = random_layout(self.rng, self.charset)
                 sigma = self.config.initial_sigma * self.rng.uniform(0.6, 1.4)
 
             if layout in seen:

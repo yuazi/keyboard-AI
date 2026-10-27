@@ -19,19 +19,6 @@ class LayoutAnalysis:
     roll_bonus: float
     redirect_cost: float
 
-    def to_dict(self) -> dict[str, float]:
-        return {
-            "score": self.score,
-            "effort_cost": self.effort_cost,
-            "same_finger_cost": self.same_finger_cost,
-            "same_hand_cost": self.same_hand_cost,
-            "row_jump_cost": self.row_jump_cost,
-            "repetition_cost": self.repetition_cost,
-            "alternation_bonus": self.alternation_bonus,
-            "roll_bonus": self.roll_bonus,
-            "redirect_cost": self.redirect_cost,
-        }
-
 
 def _distance(left: Slot, right: Slot) -> float:
     return math.hypot(left.row - right.row, left.col - right.col)

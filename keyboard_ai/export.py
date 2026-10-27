@@ -19,7 +19,8 @@ def export_karabiner(layout: str, geometry_name: str, output_path: Path):
     for from_key, to_char in zip(qwerty_keys, layout):
         rules.append({
             "type": "basic",
-            "from": {"key_code": from_key},
+            # Without optional modifiers Karabiner skips the rule while Shift is held.
+            "from": {"key_code": from_key, "modifiers": {"optional": ["any"]}},
             "to": [{"key_code": to_char}]
         })
         
